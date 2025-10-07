@@ -1,2 +1,2 @@
 # SeniorProject_TapIn
-Github Repo for Senior Year Project. POS System Solution.
+Github Repo for Senior Year Project. Solei, Bliss & Ima
