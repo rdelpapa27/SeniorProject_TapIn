@@ -1,0 +1,268 @@
+import SwiftUI
+
+struct PaymentScreen: View {
+    @State private var amountTendered: String = "65.00"
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.0078, green: 0.188, blue: 0.278)
+                .edgesIgnoringSafeArea(.all)
+            
+            // Top-left orange shape (90% opacity)
+                        RoundedRectangle(cornerRadius: 84)
+                            .fill(Color(red: 0.984, green: 0.522, blue: 0.000).opacity(0.90))
+                            .frame(width: 393.21, height: 268.48)
+                            .rotationEffect(.degrees(15.97))
+                            .offset(x: 530, y: -300)
+                            
+            // Bottom-right orange shape (73.33% opacity)
+                        RoundedRectangle(cornerRadius: 84)
+                            .fill(Color(red: 0.984, green: 0.522, blue: 0.000).opacity(0.7333))
+                            .frame(width: 361.22, height: 337.01)
+                            .rotationEffect(.degrees(40))
+                            .offset(x: -600, y: 300)
+
+            HStack(spacing: 20) {
+                // LEFT PANEL
+                VStack(alignment: .leading, spacing: 20) {
+                    // Back Button
+                    Button(action: {}) {
+                        Image(systemName: "arrow.left")
+                            .foregroundColor(.white)
+                            .font(.title2)
+                    }
+
+                    VStack(spacing: 20) {
+                        
+                        // ONE GRAY BOX contains header + items
+                        VStack(spacing: 16) {
+                            
+                            // Table Header (INSIDE the gray box)
+                            VStack(spacing: 6) {
+                                Text("Table 5")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "person.fill").foregroundColor(.white)
+                                    Text("James Uzumaki").foregroundColor(.white)
+                                    Image(systemName: "person.2.fill").foregroundColor(.white)
+                                    Text("2 guests").foregroundColor(.white)
+                                }
+                                .font(.caption)
+                            }
+                            .padding(.top, 6)
+                            
+                            // Order Items (also inside the same box)
+                            VStack(alignment: .leading, spacing: 18) {
+                                OrderItem(number: 1, name: "Diet Coke", price: "3.70")
+                                OrderItem(number: 2, name: "Cheese Burguer", price: "30.50",
+                                          details: ["2x Extra Mozzarella", "1x Bacon", "1x Caramelized Onions", "2x eggs"])
+                                OrderItem(number: 5, name: "Fish Tacos", price: "22.40",
+                                          details: ["Flour tortilla, Cat Fish, Pico", "1x Extra Guacamole"])
+                            }
+                            
+                        }
+                        .padding(20)
+                        .background(Color(red: 217/255, green: 217/255, blue: 217/255).opacity(0.5))
+                        .cornerRadius(12)
+                        
+                        // Totals Section
+                        VStack(spacing: 8) {
+                            HStack { Text("Subtotal"); Spacer(); Text("$56.60") }
+                            HStack { Text("Tax"); Spacer(); Text("$8.40") }
+                            HStack { Text("Tips"); Spacer(); Text("$0.00") }
+                            Divider().background(Color.white)
+                            HStack { Text("Total:").bold(); Spacer(); Text("$65.00").bold() }
+                            HStack { Text("Balance due:").bold(); Spacer(); Text("$65.00").bold() }
+                        }
+                        .foregroundColor(.white)
+                        .padding(20)
+                        .background(Color(red: 217/255, green: 217/255, blue: 217/255).opacity(0.5))
+                        .cornerRadius(12)
+                        
+                        Button(action: {}) {
+                            Text("Done")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                        }
+                    }// End of Left side panel
+                }// End of V stack for left panel
+                .frame(width: 450)
+                .offset(x: -50)
+// -------------------------------------------------------------------------------------------
+                // RIGHT SIDE: keypad and payment
+                VStack(spacing: 30) {
+                    Text("Balance due: $65.00")
+                        .foregroundColor(.white)
+                        .font(.title)
+                        .bold()
+                        .frame(width: 300, height: 60) // adjust size as needed
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(12)
+                        .offset(x:-135)
+
+                    // HStack for balance due and amount tendered side by side
+                    HStack(spacing: 12) {
+                        
+                        
+                        // Balance Due Box
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Balance due")
+                                .foregroundColor(.white)
+                                .font(.title3)
+                            
+                            
+                            Text("$65.00")
+                                .foregroundColor(.white)
+                                .frame(width: 120, height: 60)
+                                .background(Color.white.opacity(0.2))
+                                .cornerRadius(10)
+                                .font(.title3)
+                        }// end of balance due box
+                        .offset(x:-10)
+                       
+                        // Amount Tendered Box
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Amount tendered")
+                                .foregroundColor(.white)
+                                .font(.title3)
+                            TextField("", text: $amountTendered)
+                                .padding()
+                                .background(Color.white.opacity(0.2))
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                                .frame(width: 420, height: 60)
+                                .font(.title3)
+                            
+                        }
+                        .offset(x:10)
+                        
+                        
+                    }
+                    KeypadGrid(amount: $amountTendered)
+
+                    // Payment Types
+                    HStack(spacing: 20) {
+                        PaymentButton(label: "Credit Card", icon: "creditcard")
+                        PaymentButton(label: "$ Cash", icon: "")
+                    }
+
+                    HStack(spacing: 20) {
+                        PaymentButton(label: "Apple Pay", icon: "apple.logo")
+                        PaymentButton(label: "Split", icon: "rectangle.split.3x1")
+                    }
+                } // End of V stack
+                .offset(x:-20)
+            }
+            .padding(.horizontal, 0)
+        }
+    }
+}
+
+// ORDER ITEM COMPONENT - Ima needs to confirm the order items attributes here
+struct OrderItem: View {
+    let number: Int
+    let name: String
+    let price: String
+    var details: [String] = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("\(number)")
+                    .font(.subheadline)
+                    .padding(8)
+                    .background(Color.gray.opacity(0.4))
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+                Text(name)
+                    .foregroundColor(.white)
+                Spacer()
+                Text("$\(price)")
+                    .foregroundColor(.white)
+            }
+            .font(.headline)
+
+            ForEach(details, id: \.self) { d in
+                Text(d)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.leading, 36)
+            }
+        }
+    }
+}
+
+// NUMERIC KEYPAD
+struct KeypadGrid: View {
+    @Binding var amount: String
+
+    let layout = [
+        ["1", "2", "3", "$5"],
+        ["4", "5", "6", "$10"],
+        ["7", "8", "9", "$50"],
+        ["C", "0", "00", "⌫"]
+    ]
+
+    var body: some View {
+        VStack(spacing: 15) {
+            ForEach(layout, id: \.self) { row in
+                HStack(spacing: 30) {
+                    ForEach(row, id: \.self) { item in
+                        Button(action: { handlePress(item) }) {
+                            Text(item)
+                                .frame(width: 120, height: 70)
+                                .background(Color.gray.opacity(0.35))
+                                .foregroundColor(.white)
+                                .font(.title2)
+                                .cornerRadius(10)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func handlePress(_ key: String) {
+        switch key {
+        case "C": amount = ""
+        case "⌫": if !amount.isEmpty { amount.removeLast() }
+        case "$5": amount = "5.00"
+        case "$10": amount = "10.00"
+        case "$50": amount = "50.00"
+        default: amount += key
+        }
+    }
+}
+
+// PAYMENT BUTTON
+struct PaymentButton: View {
+    let label: String
+    let icon: String
+
+    var body: some View {
+        Button(action: {}) {
+            HStack {
+                Image(systemName: icon)
+                Text(label)
+                    .font(.title2)
+            }
+            .frame(width: 280, height: 60)
+            .background(Color.gray.opacity(0.35))
+            .foregroundColor(.white)
+            .cornerRadius(12)
+        }
+    }
+}
+
+struct PaymentScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        PaymentScreen()
+            .previewInterfaceOrientation(.landscapeLeft)
+    }
+}
