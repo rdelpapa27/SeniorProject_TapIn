@@ -9,7 +9,7 @@ import FirebaseFirestore
 struct TipScreenView: View {
 
     let totalAmount: Double
-    let table: TableInfo
+    let tableNumber: String
     let db = Firestore.firestore()
 
     @State private var selectedTip: String? = nil
@@ -17,7 +17,7 @@ struct TipScreenView: View {
     @State private var goThankYou = false
 
     // ----------------------------------------------------------
-    // MARK: - Computed Values (unchanged)
+    // MARK: - Computed Values
     // ----------------------------------------------------------
 
     var computedTip: Double {
@@ -36,7 +36,7 @@ struct TipScreenView: View {
     }
 
     // ----------------------------------------------------------
-    // MARK: - Body (unchanged UI)
+    // MARK: - Body
     // ----------------------------------------------------------
 
     var body: some View {
@@ -69,7 +69,7 @@ struct TipScreenView: View {
             .padding(.top, 20)
         }
         .fullScreenCover(isPresented: $goThankYou) {
-            ThankYouView(finalAmount: finalTotal, tableNumber: table.tableNumber)
+            ThankYouView(finalAmount: finalTotal, tableNumber: tableNumber)
         }
     }
 
@@ -185,17 +185,17 @@ struct TipScreenView: View {
     }
 
     // ----------------------------------------------------------
-    // MARK: - Reset Table (compatible with qty + notes)
+    // MARK: - Reset Table
     // ----------------------------------------------------------
 
     func resetTable() {
         db.collection("tables")
-            .document(table.tableNumber)
+            .document(tableNumber)
             .updateData([
-                "items": [],      // clears all qty + notes items
+                "items": [],
                 "guests": 0
             ]) { _ in
-                print("Table \(table.tableNumber) cleared from TipScreenView.")
+                print("Table \(tableNumber) cleared from TipScreenView.")
             }
     }
 }

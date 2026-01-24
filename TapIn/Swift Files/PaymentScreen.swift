@@ -19,23 +19,37 @@ struct PaymentScreen: View {
     @State private var goTip = false
     @State private var liveTable: TableInfo
 
+    // FREEZE TOTALS (prevents tip screen showing $0.00 due to live listener changes)
+    @State private var frozenSubtotal: Double = 0
+    @State private var frozenTax: Double = 0
+    @State private var frozenTotal: Double = 0
+
     init(table: TableInfo) {
         self.table = table
         _liveTable = State(initialValue: table)
         _remaining = State(initialValue: 0)
         _tendered = State(initialValue: 0)
+
+        // compute initial frozen totals from the passed-in snapshot
+        let initialSubtotal = table.items.reduce(0) { $0 + ($1.price * Double($1.qty)) }
+        let initialTax = initialSubtotal * 0.148
+        let initialTotal = initialSubtotal + initialTax
+
+        _frozenSubtotal = State(initialValue: initialSubtotal)
+        _frozenTax = State(initialValue: initialTax)
+        _frozenTotal = State(initialValue: initialTotal)
     }
 
     // ===============================================================
-    // MARK: - Totals
+    // MARK: - Totals (LIVE for ticket rows, FROZEN for payment)
     // ===============================================================
 
-    var subtotal: Double { liveTable.items.reduce(0) { $0 + ($1.price * Double($1.qty)) } }
-    var tax: Double { subtotal * 0.148 }
-    var total: Double { subtotal + tax }
+    var liveSubtotal: Double { liveTable.items.reduce(0) { $0 + ($1.price * Double($1.qty)) } }
+    var liveTax: Double { liveSubtotal * 0.148 }
+    var liveTotal: Double { liveSubtotal + liveTax }
 
     var changeDue: Double {
-        max(tendered - total, 0)
+        max(tendered - frozenTotal, 0)
     }
 
     // ===============================================================
@@ -61,11 +75,11 @@ struct PaymentScreen: View {
             }
         }
         .navigationDestination(isPresented: $goTip) {
-            TipScreenView(totalAmount: total, table: liveTable)
+            TipScreenView(totalAmount: frozenTotal, tableNumber: table.tableNumber)
         }
         .onAppear {
             tendered = 0
-            remaining = total    // initially full amount remains
+            remaining = frozenTotal
             listenToTable()
         }
     }
@@ -146,13 +160,13 @@ struct PaymentScreen: View {
                 HStack {
                     Text("Subtotal:")
                     Spacer()
-                    Text(format(subtotal))
+                    Text(format(frozenSubtotal))
                 }
 
                 HStack {
                     Text("Tax:")
                     Spacer()
-                    Text(format(tax))
+                    Text(format(frozenTax))
                 }
 
                 Divider().padding(.vertical, 4)
@@ -161,7 +175,7 @@ struct PaymentScreen: View {
                     Text("Total:")
                         .fontWeight(.bold)
                     Spacer()
-                    Text(format(total))
+                    Text(format(frozenTotal))
                         .fontWeight(.bold)
                 }
             }
@@ -248,14 +262,9 @@ struct PaymentScreen: View {
 
             selectedMethod = method
 
-            // Card or Apple Pay → auto charge remaining balance
+            // Card / Apple Pay / Split → proceed to tip on frozen total
             if method != "Cash" {
-                if remaining <= 0 {
-                    goTip = true
-                } else {
-                    // charge only remaining
-                    goTip = true
-                }
+                goTip = true
             }
 
         } label: {
@@ -316,7 +325,7 @@ struct PaymentScreen: View {
             //
             // REMAINING BALANCE (ONLY WHEN tendered < total)
             //
-            if tendered < total {
+            if tendered < frozenTotal {
                 HStack {
                     Text("Remaining Balance:")
                         .foregroundColor(.white.opacity(0.9))
@@ -343,7 +352,7 @@ struct PaymentScreen: View {
             //
             // CHANGE DUE (ONLY WHEN OVER-TENDERED)
             //
-            if tendered > total {
+            if tendered > frozenTotal {
                 HStack {
                     Text("Change Due:")
                         .foregroundColor(.white.opacity(0.9))
@@ -391,7 +400,7 @@ struct PaymentScreen: View {
 
     var exactButton: some View {
         Button {
-            tendered = total
+            tendered = frozenTotal
             updateRemaining()
         } label: {
             Text("Exact")
@@ -408,12 +417,10 @@ struct PaymentScreen: View {
     // ===============================================================
 
     func handleContinue() {
-        if tendered < total {
-            // Partial payment: user must choose another method for remainder
-            remaining = total - tendered
-            selectedMethod = nil   // temporarily reset selection
+        if tendered < frozenTotal {
+            remaining = frozenTotal - tendered
+            selectedMethod = nil
         } else {
-            // Full or over payment → go tip
             goTip = true
         }
     }
@@ -423,7 +430,7 @@ struct PaymentScreen: View {
     // ===============================================================
 
     func updateRemaining() {
-        remaining = total - tendered
+        remaining = frozenTotal - tendered
         if remaining < 0 { remaining = 0 }
     }
 
@@ -439,7 +446,7 @@ struct PaymentScreen: View {
     }
 
     // ===============================================================
-    // MARK: - Firestore Listener
+    // MARK: - Firestore Listener (updates LIVE ticket only)
     // ===============================================================
 
     func listenToTable() {
