@@ -21,7 +21,7 @@ struct LogInView: View {
             TableViewRoom()
         }
         .navigationDestination(isPresented: $goKitchen) {
-            Text("Kitchen View")
+            KitchenDashboard()   // ✅ FIX — was Text("Kitchen View")
         }
         .navigationDestination(isPresented: $goAdmin) {
             Text("Admin Dashboard")
@@ -153,11 +153,9 @@ struct PasscodeView: View {
         }
     }
 
-    // CLEAR / DELETE
     func clearPasscode() { passcode.removeAll() }
     func removeLastDigit() { if !passcode.isEmpty { passcode.removeLast() } }
 
-    // FIREBASE VALIDATION
     func validatePin() {
         isLoading = true
         loginError = false

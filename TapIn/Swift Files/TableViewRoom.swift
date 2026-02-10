@@ -108,7 +108,9 @@ struct TableViewRoom: View {
                         updateGuestCount(table: table, guests: newGuests)
                     },
                     close: { showPanel = false },
-                    sendAction: {},
+                    sendAction: {
+                        sendTableToKitchen(table)
+                    },
                     payAction: {
                         tableForPayment = table
                         openPayment = true
@@ -134,6 +136,34 @@ struct TableViewRoom: View {
                 selectedTable = updated
             }
         }
+    }
+
+    // ===========================================================
+    // MARK: - SEND TO KITCHEN (LOGIC ONLY)
+    // ===========================================================
+
+    func sendTableToKitchen(_ table: TableInfo) {
+
+        let orderRef = db.collection("kitchenOrders").document()
+
+        let itemsSnapshot = table.items.grouped().map { grouped in
+            [
+                "name": grouped.item.name,
+                "qty": grouped.quantity,
+                "notes": grouped.item.notes
+            ]
+        }
+
+        let payload: [String: Any] = [
+            "orderNumber": orderRef.documentID,
+            "tableNumber": table.tableNumber,
+            "serverName": "James Uzumaki",
+            "items": itemsSnapshot,
+            "status": "new",
+            "createdAt": Timestamp()
+        ]
+
+        orderRef.setData(payload)
     }
 
     func tableButton(
@@ -260,7 +290,7 @@ struct OrderItemRow: View {
 
 //
 // ===============================================================
-// MARK: - SIDE PANEL (GUEST TICKER MOVED ABOVE SEND)
+// MARK: - SIDE PANEL
 // ===============================================================
 //
 
@@ -284,7 +314,6 @@ struct SidePanel: View {
 
         VStack(spacing: 0) {
 
-            // HEADER
             HStack {
                 Button(action: close) {
                     Image(systemName: "chevron.left")
@@ -321,13 +350,14 @@ struct SidePanel: View {
 
             Divider().background(Color.white.opacity(0.3))
 
-            // ITEM LIST
             ScrollView {
                 VStack(spacing: 14) {
                     ForEach(table.items.grouped(), id: \.item.id) { grouped in
-                        OrderItemRow(item: grouped.item,
-                                     quantity: grouped.quantity,
-                                     onDelete: { removeItem(grouped.item) })
+                        OrderItemRow(
+                            item: grouped.item,
+                            quantity: grouped.quantity,
+                            onDelete: { removeItem(grouped.item) }
+                        )
                     }
                 }
                 .padding(.horizontal)
@@ -335,9 +365,6 @@ struct SidePanel: View {
             }
             .frame(maxHeight: 300)
 
-            //
-            // GUEST TICKER MOVED HERE (directly above SEND)
-            //
             HStack(spacing: 24) {
 
                 Button(action: {
@@ -368,9 +395,6 @@ struct SidePanel: View {
             .padding(.top, 12)
             .padding(.bottom, 18)
 
-            //
-            // SEND / MENU / PRINT BUTTONS
-            //
             VStack(spacing: 16) {
 
                 posButton(
@@ -396,9 +420,6 @@ struct SidePanel: View {
             }
             .padding(.horizontal)
 
-            //
-            // TOTALS + PAY BUTTON
-            //
             VStack(spacing: 8) {
 
                 HStack {
@@ -504,4 +525,3 @@ struct TableView: View {
         .buttonStyle(.plain)
     }
 }
-

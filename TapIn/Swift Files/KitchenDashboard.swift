@@ -1,273 +1,285 @@
+//
+//  KitchenDashboard.swift
+//  TapIn
+//
+
 import SwiftUI
+import FirebaseFirestore
+import Combine
 
-// MARK: - UI-Only Models (No Conflicts)
+// ===============================================================
+// MARK: - Models
+// ===============================================================
 
-struct KitchenDashboardOrder: Identifiable {
-    let id = UUID()
+struct KitchenOrder: Identifiable {
+    let id: String
     let orderNumber: String
+    let tableNumber: String
     let serverName: String
-    let tableNumber: Int
-    let items: [KitchenLineItem]
+    let items: [KitchenItem]
     let createdAt: Date
+    let status: String
 }
 
-struct KitchenLineItem: Identifiable {
+struct KitchenItem: Identifiable {
     let id = UUID()
-    let quantity: Int
-    let itemName: String
-    let modifiers: [String]
+    let name: String
+    let qty: Int
+    let notes: String
 }
 
-// MARK: - Main View
+// ===============================================================
+// MARK: - ViewModel (UNCHANGED)
+// ===============================================================
+
+final class KitchenDashboardViewModel: ObservableObject {
+
+    @Published var orders: [KitchenOrder] = []
+
+    private let db = Firestore.firestore()
+    private var listener: ListenerRegistration?
+
+    init() { listen() }
+    deinit { listener?.remove() }
+
+    func listen() {
+        listener = db.collection("kitchenOrders")
+            .whereField("status", in: ["new", "ready"])
+            .order(by: "createdAt")
+            .addSnapshotListener { snap, _ in
+                guard let docs = snap?.documents else { return }
+                self.orders = docs.compactMap { self.map($0) }
+            }
+    }
+
+    func markReady(_ order: KitchenOrder) {
+        updateLocal(order.id, status: "ready")
+        updateRemote(order.id, status: "ready")
+    }
+
+    func clear(_ order: KitchenOrder) {
+        orders.removeAll { $0.id == order.id }
+        updateRemote(order.id, status: "cleared")
+    }
+
+    private func updateLocal(_ id: String, status: String) {
+        guard let i = orders.firstIndex(where: { $0.id == id }) else { return }
+        let o = orders[i]
+        orders[i] = KitchenOrder(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            tableNumber: o.tableNumber,
+            serverName: o.serverName,
+            items: o.items,
+            createdAt: o.createdAt,
+            status: status
+        )
+    }
+
+    private func updateRemote(_ id: String, status: String) {
+        db.collection("kitchenOrders")
+            .document(id)
+            .updateData(["status": status])
+    }
+
+    private func map(_ doc: QueryDocumentSnapshot) -> KitchenOrder? {
+        let d = doc.data()
+
+        guard
+            let orderNumber = d["orderNumber"] as? String,
+            let tableNumber = d["tableNumber"] as? String,
+            let serverName = d["serverName"] as? String,
+            let status = d["status"] as? String,
+            let ts = d["createdAt"] as? Timestamp,
+            let raw = d["items"] as? [[String: Any]]
+        else { return nil }
+
+        let items: [KitchenItem] = raw.compactMap { item in
+            guard
+                let name = item["name"] as? String,
+                let qty = item["qty"] as? Int
+            else { return nil }
+
+            return KitchenItem(
+                name: name,
+                qty: qty,
+                notes: item["notes"] as? String ?? ""
+            )
+        }
+
+        return KitchenOrder(
+            id: doc.documentID,
+            orderNumber: orderNumber,
+            tableNumber: tableNumber,
+            serverName: serverName,
+            items: items,
+            createdAt: ts.dateValue(),
+            status: status
+        )
+    }
+}
+
+// ===============================================================
+// MARK: - Dashboard
+// ===============================================================
 
 struct KitchenDashboard: View {
 
-    @State private var orders: [KitchenDashboardOrder] = SampleKitchenData.orders
-    @State private var selectedOrderID: UUID?
-
-    private let columns: [GridItem] = Array(
-        repeating: GridItem(.flexible(), spacing: 16),
-        count: 4
-    )
+    @StateObject private var vm = KitchenDashboardViewModel()
 
     var body: some View {
+
         ZStack {
 
-            Color.white.ignoresSafeArea()
-
-            decorativeShapes
+            BackgroundDecorView()
 
             VStack(spacing: 0) {
 
-                header
+                HStack {
+                    Text("Kitchen Order Dashboard")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(Color(red: 0.02, green: 0.20, blue: 0.30))
 
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(orders, id: \.id) { order in
-                            OrderCard(
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 20) {
+                        ForEach(Array(vm.orders.enumerated()), id: \.element.id) { index, order in
+                            TicketView(
                                 order: order,
-                                isSelected: selectedOrderID == order.id
+                                orderIndex: index + 1,
+                                onReady: { vm.markReady(order) },
+                                onClear: { vm.clear(order) }
                             )
-                            .onTapGesture {
-                                selectedOrderID = order.id
-                            }
                         }
                     }
-                    .padding()
+                    .padding(24)
                 }
-
-                footer
             }
         }
-    }
-
-    // MARK: - Header
-
-    // MARK: - Header (Logout + Title)
-
-    private var header: some View {
-        HStack(spacing: 16) {
-
-            // Logout Button
-            Button(action: {
-                // TODO: Hook into logout logic
-                print("Logout tapped")
-            }) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44) // proper tap size
-            }
-
-            // Restaurant Name
-            Text("Restaurant Name")
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(Color(hex: "023047"))
-    }
-
-
-    // MARK: - Footer
-
-    private var footer: some View {
-        HStack {
-            Spacer()
-            Button("Ready") {
-                // Mark order ready
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 12)
-            .background(
-                selectedOrderID == nil
-                ? Color.gray
-                : Color(hex: "023047")
-            )
-            .cornerRadius(10)
-            .disabled(selectedOrderID == nil)
-        }
-        .padding()
-        .background(Color(hex: "023047"))
-    }
-
-    // MARK: - Decorative Shapes
-
-    private var decorativeShapes: some View {
-        ZStack {
-            // Top-left orange shape (73.33% opacity)
-            RoundedRectangle(cornerRadius: 84)
-                .fill(Color(red: 0.984, green: 0.522, blue: 0.000).opacity(0.7333))
-                .frame(width: 649.91, height: 691.79)
-                .rotationEffect(.degrees(55))
-                .offset(x: -500, y: -400)
-                
-            // Bottom-right orange shape (100% opacity)
-            RoundedRectangle(cornerRadius: 84)
-                .fill(Color(red: 0.984, green: 0.522, blue: 0.000))
-                .frame(width: 646.88, height: 490.5)
-                .rotationEffect(.degrees(26))
-                .offset(x: 600, y: 400)
-        }
+        .ignoresSafeArea(edges: .bottom)
     }
 }
 
-// MARK: - Order Card View
+// ===============================================================
+// MARK: - Background Decor (BIGGER + 30° TILT)
+// ===============================================================
 
-struct OrderCard: View {
+struct BackgroundDecorView: View {
+    var body: some View {
+        ZStack {
 
-    let order: KitchenDashboardOrder
-    let isSelected: Bool
+            // TOP-LEFT CORNER — BIGGER + ROTATED
+            VStack {
+                HStack {
+                    RoundedRectangle(cornerRadius: 180)
+                        .fill(Color.orange.opacity(0.55))
+                        .frame(width: 700, height: 700)
+                        .rotationEffect(.degrees(30))
+                        .offset(x: -140, y: -140)
+                    Spacer()
+                }
+                Spacer()
+            }
+
+            // BOTTOM-RIGHT CORNER — BIGGER + ROTATED
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    RoundedRectangle(cornerRadius: 220)
+                        .fill(Color.orange.opacity(0.50))
+                        .frame(width: 900, height: 550)
+                        .rotationEffect(.degrees(30))
+                        .offset(x: 180, y: 180)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// ===============================================================
+// MARK: - Ticket View (UNCHANGED)
+// ===============================================================
+
+struct TicketView: View {
+
+    let order: KitchenOrder
+    let orderIndex: Int
+    let onReady: () -> Void
+    let onClear: () -> Void
+
+    var minutesAgo: String {
+        let mins = Int(Date().timeIntervalSince(order.createdAt) / 60)
+        return mins <= 0 ? "just now" : "\(mins)m ago"
+    }
 
     var body: some View {
-        VStack(spacing: 0){
-            
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(order.orderNumber)
-                        .fontWeight(.bold)
-                    Text("TABLE: \(order.tableNumber)")
+
+        VStack(spacing: 0) {
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Order #\(orderIndex)")
+                        .font(.system(size: 16, weight: .bold))
+                    Spacer()
+                    Text(minutesAgo)
+                        .font(.system(size: 12, weight: .medium))
                 }
 
-                Spacer()
-
-                Text(order.serverName)
-                    .fontWeight(.semibold)
+                HStack {
+                    Text("TABLE: \(order.tableNumber)")
+                    Spacer()
+                    Text(order.serverName.uppercased())
+                }
+                .font(.system(size: 13, weight: .semibold))
             }
-            .font(.subheadline)
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading) // ✅ MATCH WIDTH
             .foregroundColor(.white)
-            .background(Color(hex: "FB8500"))
+            .padding(8)
+            .background(Color.orange)
 
-            // Order Details
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(order.items, id: \.id) { item in
+            VStack(alignment: .leading, spacing: 10) {
+
+                ForEach(order.items) { item in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(item.quantity) x \(item.itemName)")
-                            .fontWeight(.semibold)
-
-                        ForEach(item.modifiers, id: \.self) {
-                            Text($0)
+                        Text("\(item.qty) x \(item.name)")
+                            .font(.system(size: 17, weight: .bold))
+                        if !item.notes.isEmpty {
+                            Text(item.notes)
+                                .font(.system(size: 15))
                                 .foregroundColor(.red)
+                                .padding(.leading, 10)
                         }
                     }
                 }
 
-                Spacer()
+                Button(action: order.status == "new" ? onReady : onClear) {
+                    Text(order.status == "new" ? "READY" : "CLEAR")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(order.status == "new" ? Color.green : Color.gray)
+                        .cornerRadius(6)
+                }
+                .padding(.top, 6)
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .topLeading) // ✅ MATCH WIDTH
-            .background(Color(hex: "D9D9D9"))
+            .padding(12)
+            .background(Color(.systemGray5))
         }
-        .frame(minHeight: 420)
+        .frame(width: 280)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.orange)
+                .offset(x: 8, y: 8)
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(
-                    isSelected ? Color(hex: "023047") : .clear,
-                    lineWidth: 3
-                )
-        )
-        .cornerRadius(6)
-
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(
-                    isSelected ? Color(hex: "023047") : .clear,
-                    lineWidth: 3
-                )
-        )
-        .cornerRadius(6)
-    }
-}
-
-// MARK: - Sample Data
-
-enum SampleKitchenData {
-    static let orders: [KitchenDashboardOrder] = [
-        KitchenDashboardOrder(
-            orderNumber: "#00038",
-            serverName: "WILL H.",
-            tableNumber: 2,
-            items: [
-                KitchenLineItem(
-                    quantity: 1,
-                    itemName: "Burger",
-                    modifiers: [
-                        "medium rare",
-                        "American cheese",
-                        "lettuce",
-                        "no tomatoes"
-                    ]
-                )
-            ],
-            createdAt: Date()
-        ),
-        KitchenDashboardOrder(
-            orderNumber: "#00042",
-            serverName: "WILL H.",
-            tableNumber: 5,
-            items: [
-                KitchenLineItem(
-                    quantity: 1,
-                    itemName: "Burger",
-                    modifiers: [
-                        "medium rare",
-                        "American cheese",
-                        "lettuce",
-                        "no tomatoes"
-                    ]
-                )
-            ],
-            createdAt: Date()
-        )
-    ]
-}
-
-// MARK: - Color Helper
-
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-
-        self.init(
-            red: Double((int >> 16) & 0xFF) / 255,
-            green: Double((int >> 8) & 0xFF) / 255,
-            blue: Double(int & 0xFF) / 255
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 2)
         )
     }
 }
 
-// MARK: - Preview
-
-#Preview {
-    KitchenDashboard()
-}
