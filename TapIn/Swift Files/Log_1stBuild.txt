@@ -1,0 +1,31 @@
+
+### 🎨 UI / UX (User Interface & User Experience)
+
+* **Dynamic Kitchen Display System (KDS):** Completely redesigned the Kitchen screen from a single horizontal scroll to a responsive, multi-column grid layout. Tickets now dynamically expand in height based on order size.
+* **Course Pacing Visuals:** Kitchen tickets now visually group items by their course (Appetizers, Entrees, Desserts) within a single ticket using distinct gray dividers and sub-headers.
+* **Side Panel Optimization:** Massively increased the maximum vertical height of the order Side Panel (to 550px) to prevent large orders from looking cramped.
+* **Fluid Animations:** Added a natural spring animation to the Side Panel, allowing it to smoothly slide in from the left edge of the screen when a table is tapped.
+* **Smart Tap-to-Dismiss:** Engineered a custom tap-catcher layer behind the Side Panel and Notification dropdown. Users can now intuitively tap any empty space on the floor plan to instantly close open menus without accidentally triggering other buttons.
+* **Modernized Navigation:** Redesigned the "Log Out" button on the floor plan to be a sleek, icon-only button that perfectly matches the top-right toolbars.
+
+### 💻 Frontend (SwiftUI Architecture & Application Logic)
+
+* **Dynamic Employee Recognition:** Implemented `@AppStorage` globally. When a user logs in via the PIN pad, their actual name (e.g., "James Uzumaki") is saved to device memory and instantly populates across the Table View, Side Panel, Order Menu, and Receipt generator.
+* **Live Drag-and-Drop Editor:** Built a fully interactive `FloorPlanEditorView` in the Admin Dashboard. Admins can spawn tables, drag them across the canvas using iOS `DragGesture` coordinates, edit their shapes/names, and delete them.
+* **Table/Room Isolation Logic:** Fixed a critical data-mixing bug by dynamically appending the room name to the table label on the backend (e.g., `T1 (Patio)` vs `T1 (Main Room)`). This ensures orders from different rooms never collide.
+* **Performance Optimization (Lazy Loading):** Swapped standard `VStack` components for `LazyVStack` inside the Admin Staff and Menu editor lists. This prevents the iPad from rendering off-screen data, fixing severe UI lag and dropped inputs on dropdown menus.
+* **Safe Navigation Routing:** Replaced brute-force `rootViewController` dismissals with safe `@Environment(\.dismiss)` and native `NotificationCenter` broadcasts. This allows the Tip Screen to drop away smoothly after payment without destroying the app's navigation history or breaking the Log Out button.
+
+### ⚙️ Backend (Firebase Firestore & Data Management)
+
+* **Cloud-Synced Floor Plans:** Upgraded static `TableDefinition` and `RoomLayout` structs to conform to `Codable`. The app now converts the Admin's custom drag-and-drop floor plan into JSON and saves it directly to Firestore (`settings/floorplan`).
+* **Real-time Layout Fetching:** The Floor Plan screen now runs a live Firestore listener. If an Admin moves a table, the server iPads update their layouts in real-time. Added a local hardcoded fallback layout to prevent blank screens on fresh database loads.
+* **Safe Document Creation:** Upgraded Firestore writes to use `.setData(["items": ...], merge: true)`. This creates a new table document on the fly if it doesn't exist, preventing "No document to update" crashes during rushes.
+* **Composite Indexing:** Identified and resolved a real-time sync failure on the Kitchen Dashboard by building a Firebase Composite Index. This allows the app to simultaneously filter (`status == "new"`) and sort (`createdAt`) orders in milliseconds.
+
+### 📱 System & App Configuration
+
+* **Strict Light Mode Enforcement:** Injected `.preferredColorScheme(.light)` into the `TapInApp.swift` root file. This prevents the iPad's system-level Dark Mode from inverting the app's custom Navy and Orange color palette.
+* **Landscape Orientation Lock:** Configured Xcode's `UIRequiresFullScreen` and deployment targets to permanently lock the app in Landscape mode, preventing accidental screen rotations when servers handle the iPad.
+* **Physical Device Sideloading:** Successfully provisioned the app with an Apple Developer Personal Team signature to allow physical deployment and testing on an actual iPad hardware environment.
+
